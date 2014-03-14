@@ -1,4 +1,4 @@
 SimpleORM
 =========
 
-Simple Object Relational Mapper for Python
+Simple SQLite3 Object Relational Mapper for Python
