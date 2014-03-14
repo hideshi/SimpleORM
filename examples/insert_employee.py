@@ -11,4 +11,4 @@ if __name__ == '__main__':
     param['age'] = 24
     param['boss'] = 3
     result = InsertEmployee(dbfile = 'test.db').execute(param)
-    print(result)
+    print('Rows affected:{}'.format(result))
