@@ -106,7 +106,7 @@ def _construct_sql(sql, param):
             result.append(line)
         elif 'if' in line:
             condition = True
-            l = line.lstrip('if').rstrip(':')
+            l = line.lstrip('if').replace(':', '')
             if eval(l):
                 enable = True
         elif condition == False:
