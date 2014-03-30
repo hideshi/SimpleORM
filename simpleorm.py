@@ -32,7 +32,7 @@ class BaseDao(object):
             sql_file = '{}/{}.sql'.format(sql_file_dir, self.dao_class_name)
             try:
                 with open(sql_file) as f:
-                    self.sql = ' '.join([line.strip() for line in f])
+                    self.sql = ' \n'.join([line.strip() for line in f])
             except FileNotFoundError as e:
                 raise SimpleOrmException(_ERROR_01.format(sql_file, type(self).__name__, sql_file_dir)) from e
 
@@ -53,9 +53,11 @@ class BaseDao(object):
                     if count % self.commit_interval == 0:
                         self.conn.commit()
             else: 
+                self.sql = _construct_sql(self.sql, param)
                 self.conn.row_factory = sqlite3.Row
                 cursor = self.conn.cursor()
-                cursor.execute(self.sql, tuple(param[key] for key in param))
+                t = tuple(param[key] for key in param if not key.startswith('_'))
+                cursor.execute(self.sql, t)
                 rows_affected += cursor.rowcount
         if self.dao_class_name.startswith('select'):
             if self.return_type == None:
@@ -78,3 +80,39 @@ class BaseDao(object):
                 return result
         else:
             return rows_affected
+
+def _construct_sql(sql, param):
+    r'''
+    >>> _construct_sql('SELECT * FROM EMPLOYEE\nWHERE NAME LIKE ?\nif param.get("age", None) != None:\nAND AGE = ?\nend', {'age':20})
+    'SELECT * FROM EMPLOYEE WHERE NAME LIKE ? AND AGE = ?'
+    >>> _construct_sql('SELECT * FROM EMPLOYEE\nWHERE NAME LIKE ?\nif param.get("age", None) != None:\nAND AGE = ?\nend', {'name':'Taro'})
+    'SELECT * FROM EMPLOYEE WHERE NAME LIKE ?'
+    >>> _construct_sql('SELECT * FROM EMPLOYEE\nWHERE NAME LIKE ?\nif param.get("_flg", None) == True:\nAND AGE = ?\nend', {'_flg':True})
+    'SELECT * FROM EMPLOYEE WHERE NAME LIKE ? AND AGE = ?'
+    >>> _construct_sql('SELECT * FROM EMPLOYEE\nWHERE NAME LIKE ?\nif param.get("_flg", None) == True:\nAND AGE = ?\nend', {'_flg':False})
+    'SELECT * FROM EMPLOYEE WHERE NAME LIKE ?'
+    >>> _construct_sql('SELECT * FROM EMPLOYEE\nWHERE NAME LIKE ?\nAND AGE = ?', {})
+    'SELECT * FROM EMPLOYEE WHERE NAME LIKE ? AND AGE = ?'
+    '''
+    lines = re.split('\n', sql)
+    result = []
+    condition = False
+    enable = False
+    for line in lines:
+        if 'end' in line:
+            condition = False
+            enable = False
+        elif condition == True and enable == True:
+            result.append(line)
+        elif 'if' in line:
+            condition = True
+            l = line.lstrip('if').rstrip(':')
+            if eval(l):
+                enable = True
+        elif condition == False:
+            result.append(line)
+    return ' '.join(result)
+
+if __name__ == '__main__':
+    from doctest import testmod
+    testmod()
